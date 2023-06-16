@@ -8312,6 +8312,10 @@ function GetCanvasHeight() { return canvas.clientHeight; }
       win.shouldClose = value;
     }
 
+  function _glfwSetWindowSize(winid, width, height) {
+      GLFW.setWindowSize(winid, width, height);
+    }
+
   function _glfwSetWindowSizeCallback(winid, cbfun) {
       return GLFW.setWindowSizeCallback(winid, cbfun);
     }
@@ -9081,6 +9085,7 @@ var wasmImports = {
   "glfwSetWindowFocusCallback": _glfwSetWindowFocusCallback,
   "glfwSetWindowIconifyCallback": _glfwSetWindowIconifyCallback,
   "glfwSetWindowShouldClose": _glfwSetWindowShouldClose,
+  "glfwSetWindowSize": _glfwSetWindowSize,
   "glfwSetWindowSizeCallback": _glfwSetWindowSizeCallback,
   "glfwSwapBuffers": _glfwSwapBuffers,
   "glfwSwapInterval": _glfwSwapInterval,
@@ -9197,8 +9202,8 @@ var _asyncify_stop_unwind = createExportWrapper("asyncify_stop_unwind");
 var _asyncify_start_rewind = createExportWrapper("asyncify_start_rewind");
 /** @type {function(...*):?} */
 var _asyncify_stop_rewind = createExportWrapper("asyncify_stop_rewind");
-var ___start_em_js = Module['___start_em_js'] = 83344;
-var ___stop_em_js = Module['___stop_em_js'] = 83419;
+var ___start_em_js = Module['___start_em_js'] = 83360;
+var ___stop_em_js = Module['___stop_em_js'] = 83435;
 
 // include: postamble.js
 // === Auto-generated postamble setup entry stuff ===
