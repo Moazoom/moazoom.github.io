@@ -3771,6 +3771,34 @@ function GetCanvasHeight() { return canvas.clientHeight; }
          ;
       }};
   
+  function setLetterbox(element, topBottom, leftRight) {
+        // Cannot use margin to specify letterboxes in FF or Chrome, since those ignore margins in fullscreen mode.
+        element.style.paddingLeft = element.style.paddingRight = leftRight + 'px';
+        element.style.paddingTop = element.style.paddingBottom = topBottom + 'px';
+    }
+  
+  function hideEverythingExceptGivenElement(onlyVisibleElement) {
+      var child = onlyVisibleElement;
+      var parent = child.parentNode;
+      var hiddenElements = [];
+      while (child != document.body) {
+        var children = parent.children;
+        for (var i = 0; i < children.length; ++i) {
+          if (children[i] != child) {
+            hiddenElements.push({ node: children[i], displayState: children[i].style.display });
+            children[i].style.display = 'none';
+          }
+        }
+        child = parent;
+        parent = parent.parentNode;
+      }
+      return hiddenElements;
+    }
+  
+  var restoreOldWindowedStyle = null;
+  
+  
+  
   function maybeCStringToJsString(cString) {
       // "cString > 2" checks if the input is a number, and isn't of the special
       // values we accept here, EMSCRIPTEN_EVENT_TARGET_* (which map to 0, 1, 2).
@@ -3785,10 +3813,308 @@ function GetCanvasHeight() { return canvas.clientHeight; }
       var domElement = specialHTMLTargets[target] || (typeof document != 'undefined' ? document.querySelector(target) : undefined);
       return domElement;
     }
+  function findCanvasEventTarget(target) { return findEventTarget(target); }
+  function _emscripten_get_canvas_element_size(target, width, height) {
+      var canvas = findCanvasEventTarget(target);
+      if (!canvas) return -4;
+      HEAP32[((width)>>2)] = canvas.width;
+      HEAP32[((height)>>2)] = canvas.height;
+    }
+  
+  
+  
+  function stringToUTF8OnStack(str) {
+      var size = lengthBytesUTF8(str) + 1;
+      var ret = stackAlloc(size);
+      stringToUTF8(str, ret, size);
+      return ret;
+    }
+  function getCanvasElementSize(target) {
+      return withStackSave(function() {
+        var w = stackAlloc(8);
+        var h = w + 4;
+  
+        var targetInt = stringToUTF8OnStack(target.id);
+        var ret = _emscripten_get_canvas_element_size(targetInt, w, h);
+        var size = [HEAP32[((w)>>2)], HEAP32[((h)>>2)]];
+        return size;
+      });
+    }
+  
+  
+  function _emscripten_set_canvas_element_size(target, width, height) {
+      var canvas = findCanvasEventTarget(target);
+      if (!canvas) return -4;
+      canvas.width = width;
+      canvas.height = height;
+      return 0;
+    }
+  
+  
+  function setCanvasElementSize(target, width, height) {
+      if (!target.controlTransferredOffscreen) {
+        target.width = width;
+        target.height = height;
+      } else {
+        // This function is being called from high-level JavaScript code instead of asm.js/Wasm,
+        // and it needs to synchronously proxy over to another thread, so marshal the string onto the heap to do the call.
+        withStackSave(function() {
+          var targetInt = stringToUTF8OnStack(target.id);
+          _emscripten_set_canvas_element_size(targetInt, width, height);
+        });
+      }
+    }
+  function registerRestoreOldStyle(canvas) {
+      var canvasSize = getCanvasElementSize(canvas);
+      var oldWidth = canvasSize[0];
+      var oldHeight = canvasSize[1];
+      var oldCssWidth = canvas.style.width;
+      var oldCssHeight = canvas.style.height;
+      var oldBackgroundColor = canvas.style.backgroundColor; // Chrome reads color from here.
+      var oldDocumentBackgroundColor = document.body.style.backgroundColor; // IE11 reads color from here.
+      // Firefox always has black background color.
+      var oldPaddingLeft = canvas.style.paddingLeft; // Chrome, FF, Safari
+      var oldPaddingRight = canvas.style.paddingRight;
+      var oldPaddingTop = canvas.style.paddingTop;
+      var oldPaddingBottom = canvas.style.paddingBottom;
+      var oldMarginLeft = canvas.style.marginLeft; // IE11
+      var oldMarginRight = canvas.style.marginRight;
+      var oldMarginTop = canvas.style.marginTop;
+      var oldMarginBottom = canvas.style.marginBottom;
+      var oldDocumentBodyMargin = document.body.style.margin;
+      var oldDocumentOverflow = document.documentElement.style.overflow; // Chrome, Firefox
+      var oldDocumentScroll = document.body.scroll; // IE
+      var oldImageRendering = canvas.style.imageRendering;
+  
+      function restoreOldStyle() {
+        var fullscreenElement = document.fullscreenElement
+          || document.webkitFullscreenElement
+          ;
+        if (!fullscreenElement) {
+          document.removeEventListener('fullscreenchange', restoreOldStyle);
+  
+          // Unprefixed Fullscreen API shipped in Chromium 71 (https://bugs.chromium.org/p/chromium/issues/detail?id=383813)
+          // As of Safari 13.0.3 on macOS Catalina 10.15.1 still ships with prefixed webkitfullscreenchange. TODO: revisit this check once Safari ships unprefixed version.
+          document.removeEventListener('webkitfullscreenchange', restoreOldStyle);
+  
+          setCanvasElementSize(canvas, oldWidth, oldHeight);
+  
+          canvas.style.width = oldCssWidth;
+          canvas.style.height = oldCssHeight;
+          canvas.style.backgroundColor = oldBackgroundColor; // Chrome
+          // IE11 hack: assigning 'undefined' or an empty string to document.body.style.backgroundColor has no effect, so first assign back the default color
+          // before setting the undefined value. Setting undefined value is also important, or otherwise we would later treat that as something that the user
+          // had explicitly set so subsequent fullscreen transitions would not set background color properly.
+          if (!oldDocumentBackgroundColor) document.body.style.backgroundColor = 'white';
+          document.body.style.backgroundColor = oldDocumentBackgroundColor; // IE11
+          canvas.style.paddingLeft = oldPaddingLeft; // Chrome, FF, Safari
+          canvas.style.paddingRight = oldPaddingRight;
+          canvas.style.paddingTop = oldPaddingTop;
+          canvas.style.paddingBottom = oldPaddingBottom;
+          canvas.style.marginLeft = oldMarginLeft; // IE11
+          canvas.style.marginRight = oldMarginRight;
+          canvas.style.marginTop = oldMarginTop;
+          canvas.style.marginBottom = oldMarginBottom;
+          document.body.style.margin = oldDocumentBodyMargin;
+          document.documentElement.style.overflow = oldDocumentOverflow; // Chrome, Firefox
+          document.body.scroll = oldDocumentScroll; // IE
+          canvas.style.imageRendering = oldImageRendering;
+          if (canvas.GLctxObject) canvas.GLctxObject.GLctx.viewport(0, 0, oldWidth, oldHeight);
+  
+          if (currentFullscreenStrategy.canvasResizedCallback) {
+            ((a1, a2, a3) => dynCall_iiii.apply(null, [currentFullscreenStrategy.canvasResizedCallback, a1, a2, a3]))(37, 0, currentFullscreenStrategy.canvasResizedCallbackUserData);
+          }
+        }
+      }
+      document.addEventListener('fullscreenchange', restoreOldStyle);
+      // Unprefixed Fullscreen API shipped in Chromium 71 (https://bugs.chromium.org/p/chromium/issues/detail?id=383813)
+      // As of Safari 13.0.3 on macOS Catalina 10.15.1 still ships with prefixed webkitfullscreenchange. TODO: revisit this check once Safari ships unprefixed version.
+      document.addEventListener('webkitfullscreenchange', restoreOldStyle);
+      return restoreOldStyle;
+    }
+  
+  function restoreHiddenElements(hiddenElements) {
+      for (var i = 0; i < hiddenElements.length; ++i) {
+        hiddenElements[i].node.style.display = hiddenElements[i].displayState;
+      }
+    }
+  
+  var currentFullscreenStrategy = {};
+  
+  
+  
+  
+  
+  
+  /** @suppress {checkTypes} */
+  function jstoi_q(str) {
+      return parseInt(str);
+    }
+  function softFullscreenResizeWebGLRenderTarget() {
+      var dpr = devicePixelRatio;
+      var inHiDPIFullscreenMode = currentFullscreenStrategy.canvasResolutionScaleMode == 2;
+      var inAspectRatioFixedFullscreenMode = currentFullscreenStrategy.scaleMode == 2;
+      var inPixelPerfectFullscreenMode = currentFullscreenStrategy.canvasResolutionScaleMode != 0;
+      var inCenteredWithoutScalingFullscreenMode = currentFullscreenStrategy.scaleMode == 3;
+      var screenWidth = inHiDPIFullscreenMode ? Math.round(innerWidth*dpr) : innerWidth;
+      var screenHeight = inHiDPIFullscreenMode ? Math.round(innerHeight*dpr) : innerHeight;
+      var w = screenWidth;
+      var h = screenHeight;
+      var canvas = currentFullscreenStrategy.target;
+      var canvasSize = getCanvasElementSize(canvas);
+      var x = canvasSize[0];
+      var y = canvasSize[1];
+      var topMargin;
+  
+      if (inAspectRatioFixedFullscreenMode) {
+        if (w*y < x*h) h = (w * y / x) | 0;
+        else if (w*y > x*h) w = (h * x / y) | 0;
+        topMargin = ((screenHeight - h) / 2) | 0;
+      }
+  
+      if (inPixelPerfectFullscreenMode) {
+        setCanvasElementSize(canvas, w, h);
+        if (canvas.GLctxObject) canvas.GLctxObject.GLctx.viewport(0, 0, w, h);
+      }
+  
+      // Back to CSS pixels.
+      if (inHiDPIFullscreenMode) {
+        topMargin /= dpr;
+        w /= dpr;
+        h /= dpr;
+        // Round to nearest 4 digits of precision.
+        w = Math.round(w*1e4)/1e4;
+        h = Math.round(h*1e4)/1e4;
+        topMargin = Math.round(topMargin*1e4)/1e4;
+      }
+  
+      if (inCenteredWithoutScalingFullscreenMode) {
+        var t = (innerHeight - jstoi_q(canvas.style.height)) / 2;
+        var b = (innerWidth - jstoi_q(canvas.style.width)) / 2;
+        setLetterbox(canvas, t, b);
+      } else {
+        canvas.style.width = w + 'px';
+        canvas.style.height = h + 'px';
+        var b = (innerWidth - w) / 2;
+        setLetterbox(canvas, topMargin, b);
+      }
+  
+      if (!inCenteredWithoutScalingFullscreenMode && currentFullscreenStrategy.canvasResizedCallback) {
+        ((a1, a2, a3) => dynCall_iiii.apply(null, [currentFullscreenStrategy.canvasResizedCallback, a1, a2, a3]))(37, 0, currentFullscreenStrategy.canvasResizedCallbackUserData);
+      }
+    }
+  
+  
+  
+  
+  
+  
   
   function getBoundingClientRect(e) {
       return specialHTMLTargets.indexOf(e) < 0 ? e.getBoundingClientRect() : {'left':0,'top':0};
     }
+  function JSEvents_resizeCanvasForFullscreen(target, strategy) {
+      var restoreOldStyle = registerRestoreOldStyle(target);
+      var cssWidth = strategy.softFullscreen ? innerWidth : screen.width;
+      var cssHeight = strategy.softFullscreen ? innerHeight : screen.height;
+      var rect = getBoundingClientRect(target);
+      var windowedCssWidth = rect.width;
+      var windowedCssHeight = rect.height;
+      var canvasSize = getCanvasElementSize(target);
+      var windowedRttWidth = canvasSize[0];
+      var windowedRttHeight = canvasSize[1];
+  
+      if (strategy.scaleMode == 3) {
+        setLetterbox(target, (cssHeight - windowedCssHeight) / 2, (cssWidth - windowedCssWidth) / 2);
+        cssWidth = windowedCssWidth;
+        cssHeight = windowedCssHeight;
+      } else if (strategy.scaleMode == 2) {
+        if (cssWidth*windowedRttHeight < windowedRttWidth*cssHeight) {
+          var desiredCssHeight = windowedRttHeight * cssWidth / windowedRttWidth;
+          setLetterbox(target, (cssHeight - desiredCssHeight) / 2, 0);
+          cssHeight = desiredCssHeight;
+        } else {
+          var desiredCssWidth = windowedRttWidth * cssHeight / windowedRttHeight;
+          setLetterbox(target, 0, (cssWidth - desiredCssWidth) / 2);
+          cssWidth = desiredCssWidth;
+        }
+      }
+  
+      // If we are adding padding, must choose a background color or otherwise Chrome will give the
+      // padding a default white color. Do it only if user has not customized their own background color.
+      if (!target.style.backgroundColor) target.style.backgroundColor = 'black';
+      // IE11 does the same, but requires the color to be set in the document body.
+      if (!document.body.style.backgroundColor) document.body.style.backgroundColor = 'black'; // IE11
+      // Firefox always shows black letterboxes independent of style color.
+  
+      target.style.width = cssWidth + 'px';
+      target.style.height = cssHeight + 'px';
+  
+      if (strategy.filteringMode == 1) {
+        target.style.imageRendering = 'optimizeSpeed';
+        target.style.imageRendering = '-moz-crisp-edges';
+        target.style.imageRendering = '-o-crisp-edges';
+        target.style.imageRendering = '-webkit-optimize-contrast';
+        target.style.imageRendering = 'optimize-contrast';
+        target.style.imageRendering = 'crisp-edges';
+        target.style.imageRendering = 'pixelated';
+      }
+  
+      var dpiScale = (strategy.canvasResolutionScaleMode == 2) ? devicePixelRatio : 1;
+      if (strategy.canvasResolutionScaleMode != 0) {
+        var newWidth = (cssWidth * dpiScale)|0;
+        var newHeight = (cssHeight * dpiScale)|0;
+        setCanvasElementSize(target, newWidth, newHeight);
+        if (target.GLctxObject) target.GLctxObject.GLctx.viewport(0, 0, newWidth, newHeight);
+      }
+      return restoreOldStyle;
+    }
+  
+  function _emscripten_enter_soft_fullscreen(target, fullscreenStrategy) {
+      target = findEventTarget(target);
+      if (!target) return -4;
+  
+      var strategy = {
+          scaleMode: HEAP32[((fullscreenStrategy)>>2)],
+          canvasResolutionScaleMode: HEAP32[(((fullscreenStrategy)+(4))>>2)],
+          filteringMode: HEAP32[(((fullscreenStrategy)+(8))>>2)],
+          canvasResizedCallback: HEAP32[(((fullscreenStrategy)+(12))>>2)],
+          canvasResizedCallbackUserData: HEAP32[(((fullscreenStrategy)+(16))>>2)],
+          target: target,
+          softFullscreen: true
+      };
+  
+      var restoreOldStyle = JSEvents_resizeCanvasForFullscreen(target, strategy);
+  
+      document.documentElement.style.overflow = 'hidden';  // Firefox, Chrome
+      document.body.scroll = "no"; // IE11
+      document.body.style.margin = '0px'; // Override default document margin area on all browsers.
+  
+      var hiddenElements = hideEverythingExceptGivenElement(target);
+  
+      function restoreWindowedState() {
+        restoreOldStyle();
+        restoreHiddenElements(hiddenElements);
+        removeEventListener('resize', softFullscreenResizeWebGLRenderTarget);
+        if (strategy.canvasResizedCallback) {
+          ((a1, a2, a3) => dynCall_iiii.apply(null, [strategy.canvasResizedCallback, a1, a2, a3]))(37, 0, strategy.canvasResizedCallbackUserData);
+        }
+        currentFullscreenStrategy = 0;
+      }
+      restoreOldWindowedStyle = restoreWindowedState;
+      currentFullscreenStrategy = strategy;
+      addEventListener('resize', softFullscreenResizeWebGLRenderTarget);
+  
+      // Inform the caller that the canvas size has changed.
+      if (strategy.canvasResizedCallback) {
+        ((a1, a2, a3) => dynCall_iiii.apply(null, [strategy.canvasResizedCallback, a1, a2, a3]))(37, 0, strategy.canvasResizedCallbackUserData);
+      }
+  
+      return 0;
+    }
+
+  
+  
   function _emscripten_get_element_css_size(target, width, height) {
       target = findEventTarget(target);
       if (!target) return -4;
@@ -5009,10 +5335,6 @@ function GetCanvasHeight() { return canvas.clientHeight; }
     }
   var _emscripten_glGetTexParameteriv = _glGetTexParameteriv;
 
-  /** @suppress {checkTypes} */
-  function jstoi_q(str) {
-      return parseInt(str);
-    }
   
   /** @noinline */
   function webglGetLeftBracePos(name) {
@@ -5892,262 +6214,6 @@ function GetCanvasHeight() { return canvas.clientHeight; }
 
   function _emscripten_memcpy_big(dest, src, num) {
       HEAPU8.copyWithin(dest, src, src + num);
-    }
-
-  
-  function setLetterbox(element, topBottom, leftRight) {
-        // Cannot use margin to specify letterboxes in FF or Chrome, since those ignore margins in fullscreen mode.
-        element.style.paddingLeft = element.style.paddingRight = leftRight + 'px';
-        element.style.paddingTop = element.style.paddingBottom = topBottom + 'px';
-    }
-  
-  
-  function findCanvasEventTarget(target) { return findEventTarget(target); }
-  function _emscripten_set_canvas_element_size(target, width, height) {
-      var canvas = findCanvasEventTarget(target);
-      if (!canvas) return -4;
-      canvas.width = width;
-      canvas.height = height;
-      return 0;
-    }
-  
-  
-  function _emscripten_get_canvas_element_size(target, width, height) {
-      var canvas = findCanvasEventTarget(target);
-      if (!canvas) return -4;
-      HEAP32[((width)>>2)] = canvas.width;
-      HEAP32[((height)>>2)] = canvas.height;
-    }
-  
-  
-  
-  
-  function stringToUTF8OnStack(str) {
-      var size = lengthBytesUTF8(str) + 1;
-      var ret = stackAlloc(size);
-      stringToUTF8(str, ret, size);
-      return ret;
-    }
-  function getCanvasElementSize(target) {
-      return withStackSave(function() {
-        var w = stackAlloc(8);
-        var h = w + 4;
-  
-        var targetInt = stringToUTF8OnStack(target.id);
-        var ret = _emscripten_get_canvas_element_size(targetInt, w, h);
-        var size = [HEAP32[((w)>>2)], HEAP32[((h)>>2)]];
-        return size;
-      });
-    }
-  
-  
-  
-  function setCanvasElementSize(target, width, height) {
-      if (!target.controlTransferredOffscreen) {
-        target.width = width;
-        target.height = height;
-      } else {
-        // This function is being called from high-level JavaScript code instead of asm.js/Wasm,
-        // and it needs to synchronously proxy over to another thread, so marshal the string onto the heap to do the call.
-        withStackSave(function() {
-          var targetInt = stringToUTF8OnStack(target.id);
-          _emscripten_set_canvas_element_size(targetInt, width, height);
-        });
-      }
-    }
-  
-  
-  
-  
-  function registerRestoreOldStyle(canvas) {
-      var canvasSize = getCanvasElementSize(canvas);
-      var oldWidth = canvasSize[0];
-      var oldHeight = canvasSize[1];
-      var oldCssWidth = canvas.style.width;
-      var oldCssHeight = canvas.style.height;
-      var oldBackgroundColor = canvas.style.backgroundColor; // Chrome reads color from here.
-      var oldDocumentBackgroundColor = document.body.style.backgroundColor; // IE11 reads color from here.
-      // Firefox always has black background color.
-      var oldPaddingLeft = canvas.style.paddingLeft; // Chrome, FF, Safari
-      var oldPaddingRight = canvas.style.paddingRight;
-      var oldPaddingTop = canvas.style.paddingTop;
-      var oldPaddingBottom = canvas.style.paddingBottom;
-      var oldMarginLeft = canvas.style.marginLeft; // IE11
-      var oldMarginRight = canvas.style.marginRight;
-      var oldMarginTop = canvas.style.marginTop;
-      var oldMarginBottom = canvas.style.marginBottom;
-      var oldDocumentBodyMargin = document.body.style.margin;
-      var oldDocumentOverflow = document.documentElement.style.overflow; // Chrome, Firefox
-      var oldDocumentScroll = document.body.scroll; // IE
-      var oldImageRendering = canvas.style.imageRendering;
-  
-      function restoreOldStyle() {
-        var fullscreenElement = document.fullscreenElement
-          || document.webkitFullscreenElement
-          ;
-        if (!fullscreenElement) {
-          document.removeEventListener('fullscreenchange', restoreOldStyle);
-  
-          // Unprefixed Fullscreen API shipped in Chromium 71 (https://bugs.chromium.org/p/chromium/issues/detail?id=383813)
-          // As of Safari 13.0.3 on macOS Catalina 10.15.1 still ships with prefixed webkitfullscreenchange. TODO: revisit this check once Safari ships unprefixed version.
-          document.removeEventListener('webkitfullscreenchange', restoreOldStyle);
-  
-          setCanvasElementSize(canvas, oldWidth, oldHeight);
-  
-          canvas.style.width = oldCssWidth;
-          canvas.style.height = oldCssHeight;
-          canvas.style.backgroundColor = oldBackgroundColor; // Chrome
-          // IE11 hack: assigning 'undefined' or an empty string to document.body.style.backgroundColor has no effect, so first assign back the default color
-          // before setting the undefined value. Setting undefined value is also important, or otherwise we would later treat that as something that the user
-          // had explicitly set so subsequent fullscreen transitions would not set background color properly.
-          if (!oldDocumentBackgroundColor) document.body.style.backgroundColor = 'white';
-          document.body.style.backgroundColor = oldDocumentBackgroundColor; // IE11
-          canvas.style.paddingLeft = oldPaddingLeft; // Chrome, FF, Safari
-          canvas.style.paddingRight = oldPaddingRight;
-          canvas.style.paddingTop = oldPaddingTop;
-          canvas.style.paddingBottom = oldPaddingBottom;
-          canvas.style.marginLeft = oldMarginLeft; // IE11
-          canvas.style.marginRight = oldMarginRight;
-          canvas.style.marginTop = oldMarginTop;
-          canvas.style.marginBottom = oldMarginBottom;
-          document.body.style.margin = oldDocumentBodyMargin;
-          document.documentElement.style.overflow = oldDocumentOverflow; // Chrome, Firefox
-          document.body.scroll = oldDocumentScroll; // IE
-          canvas.style.imageRendering = oldImageRendering;
-          if (canvas.GLctxObject) canvas.GLctxObject.GLctx.viewport(0, 0, oldWidth, oldHeight);
-  
-          if (currentFullscreenStrategy.canvasResizedCallback) {
-            ((a1, a2, a3) => dynCall_iiii.apply(null, [currentFullscreenStrategy.canvasResizedCallback, a1, a2, a3]))(37, 0, currentFullscreenStrategy.canvasResizedCallbackUserData);
-          }
-        }
-      }
-      document.addEventListener('fullscreenchange', restoreOldStyle);
-      // Unprefixed Fullscreen API shipped in Chromium 71 (https://bugs.chromium.org/p/chromium/issues/detail?id=383813)
-      // As of Safari 13.0.3 on macOS Catalina 10.15.1 still ships with prefixed webkitfullscreenchange. TODO: revisit this check once Safari ships unprefixed version.
-      document.addEventListener('webkitfullscreenchange', restoreOldStyle);
-      return restoreOldStyle;
-    }
-  
-  
-  
-  
-  function JSEvents_resizeCanvasForFullscreen(target, strategy) {
-      var restoreOldStyle = registerRestoreOldStyle(target);
-      var cssWidth = strategy.softFullscreen ? innerWidth : screen.width;
-      var cssHeight = strategy.softFullscreen ? innerHeight : screen.height;
-      var rect = getBoundingClientRect(target);
-      var windowedCssWidth = rect.width;
-      var windowedCssHeight = rect.height;
-      var canvasSize = getCanvasElementSize(target);
-      var windowedRttWidth = canvasSize[0];
-      var windowedRttHeight = canvasSize[1];
-  
-      if (strategy.scaleMode == 3) {
-        setLetterbox(target, (cssHeight - windowedCssHeight) / 2, (cssWidth - windowedCssWidth) / 2);
-        cssWidth = windowedCssWidth;
-        cssHeight = windowedCssHeight;
-      } else if (strategy.scaleMode == 2) {
-        if (cssWidth*windowedRttHeight < windowedRttWidth*cssHeight) {
-          var desiredCssHeight = windowedRttHeight * cssWidth / windowedRttWidth;
-          setLetterbox(target, (cssHeight - desiredCssHeight) / 2, 0);
-          cssHeight = desiredCssHeight;
-        } else {
-          var desiredCssWidth = windowedRttWidth * cssHeight / windowedRttHeight;
-          setLetterbox(target, 0, (cssWidth - desiredCssWidth) / 2);
-          cssWidth = desiredCssWidth;
-        }
-      }
-  
-      // If we are adding padding, must choose a background color or otherwise Chrome will give the
-      // padding a default white color. Do it only if user has not customized their own background color.
-      if (!target.style.backgroundColor) target.style.backgroundColor = 'black';
-      // IE11 does the same, but requires the color to be set in the document body.
-      if (!document.body.style.backgroundColor) document.body.style.backgroundColor = 'black'; // IE11
-      // Firefox always shows black letterboxes independent of style color.
-  
-      target.style.width = cssWidth + 'px';
-      target.style.height = cssHeight + 'px';
-  
-      if (strategy.filteringMode == 1) {
-        target.style.imageRendering = 'optimizeSpeed';
-        target.style.imageRendering = '-moz-crisp-edges';
-        target.style.imageRendering = '-o-crisp-edges';
-        target.style.imageRendering = '-webkit-optimize-contrast';
-        target.style.imageRendering = 'optimize-contrast';
-        target.style.imageRendering = 'crisp-edges';
-        target.style.imageRendering = 'pixelated';
-      }
-  
-      var dpiScale = (strategy.canvasResolutionScaleMode == 2) ? devicePixelRatio : 1;
-      if (strategy.canvasResolutionScaleMode != 0) {
-        var newWidth = (cssWidth * dpiScale)|0;
-        var newHeight = (cssHeight * dpiScale)|0;
-        setCanvasElementSize(target, newWidth, newHeight);
-        if (target.GLctxObject) target.GLctxObject.GLctx.viewport(0, 0, newWidth, newHeight);
-      }
-      return restoreOldStyle;
-    }
-  function JSEvents_requestFullscreen(target, strategy) {
-      // EMSCRIPTEN_FULLSCREEN_SCALE_DEFAULT + EMSCRIPTEN_FULLSCREEN_CANVAS_SCALE_NONE is a mode where no extra logic is performed to the DOM elements.
-      if (strategy.scaleMode != 0 || strategy.canvasResolutionScaleMode != 0) {
-        JSEvents_resizeCanvasForFullscreen(target, strategy);
-      }
-  
-      if (target.requestFullscreen) {
-        target.requestFullscreen();
-      } else if (target.webkitRequestFullscreen) {
-        target.webkitRequestFullscreen(Element.ALLOW_KEYBOARD_INPUT);
-      } else {
-        return JSEvents.fullscreenEnabled() ? -3 : -1;
-      }
-  
-      currentFullscreenStrategy = strategy;
-  
-      if (strategy.canvasResizedCallback) {
-        ((a1, a2, a3) => dynCall_iiii.apply(null, [strategy.canvasResizedCallback, a1, a2, a3]))(37, 0, strategy.canvasResizedCallbackUserData);
-      }
-  
-      return 0;
-    }
-  
-  function doRequestFullscreen(target, strategy) {
-      if (!JSEvents.fullscreenEnabled()) return -1;
-      target = findEventTarget(target);
-      if (!target) return -4;
-  
-      if (!target.requestFullscreen
-        && !target.webkitRequestFullscreen
-        ) {
-        return -3;
-      }
-  
-      var canPerformRequests = JSEvents.canPerformEventHandlerRequests();
-  
-      // Queue this function call if we're not currently in an event handler and the user saw it appropriate to do so.
-      if (!canPerformRequests) {
-        if (strategy.deferUntilInEventHandler) {
-          JSEvents.deferCall(JSEvents_requestFullscreen, 1 /* priority over pointer lock */, [target, strategy]);
-          return 1;
-        }
-        return -2;
-      }
-  
-      return JSEvents_requestFullscreen(target, strategy);
-    }
-  
-  var currentFullscreenStrategy = {};
-  
-  function _emscripten_request_fullscreen_strategy(target, deferUntilInEventHandler, fullscreenStrategy) {
-      var strategy = {
-        scaleMode: HEAP32[((fullscreenStrategy)>>2)],
-        canvasResolutionScaleMode: HEAP32[(((fullscreenStrategy)+(4))>>2)],
-        filteringMode: HEAP32[(((fullscreenStrategy)+(8))>>2)],
-        deferUntilInEventHandler: deferUntilInEventHandler,
-        canvasResizedCallback: HEAP32[(((fullscreenStrategy)+(12))>>2)],
-        canvasResizedCallbackUserData: HEAP32[(((fullscreenStrategy)+(16))>>2)]
-      };
-  
-      return doRequestFullscreen(target, strategy);
     }
 
   function getHeapMax() {
@@ -8771,6 +8837,7 @@ var wasmImports = {
   "__syscall_openat": ___syscall_openat,
   "_emscripten_get_now_is_monotonic": __emscripten_get_now_is_monotonic,
   "emscripten_date_now": _emscripten_date_now,
+  "emscripten_enter_soft_fullscreen": _emscripten_enter_soft_fullscreen,
   "emscripten_get_element_css_size": _emscripten_get_element_css_size,
   "emscripten_get_fullscreen_status": _emscripten_get_fullscreen_status,
   "emscripten_get_gamepad_status": _emscripten_get_gamepad_status,
@@ -8938,7 +9005,6 @@ var wasmImports = {
   "emscripten_glVertexAttribPointer": _emscripten_glVertexAttribPointer,
   "emscripten_glViewport": _emscripten_glViewport,
   "emscripten_memcpy_big": _emscripten_memcpy_big,
-  "emscripten_request_fullscreen_strategy": _emscripten_request_fullscreen_strategy,
   "emscripten_resize_heap": _emscripten_resize_heap,
   "emscripten_run_script": _emscripten_run_script,
   "emscripten_sample_gamepad_data": _emscripten_sample_gamepad_data,
@@ -9225,9 +9291,8 @@ var missingLibrarySymbols = [
   'screenOrientation',
   'fillOrientationChangeEventData',
   'registerOrientationChangeEventCallback',
-  'hideEverythingExceptGivenElement',
-  'restoreHiddenElements',
-  'softFullscreenResizeWebGLRenderTarget',
+  'JSEvents_requestFullscreen',
+  'doRequestFullscreen',
   'fillPointerlockChangeEventData',
   'registerPointerlockChangeEventCallback',
   'registerPointerlockErrorEventCallback',
@@ -9361,13 +9426,14 @@ var unexportedSymbols = [
   'registerMouseEventCallback',
   'fillFullscreenChangeEventData',
   'registerFullscreenChangeEventCallback',
-  'JSEvents_requestFullscreen',
   'JSEvents_resizeCanvasForFullscreen',
   'registerRestoreOldStyle',
+  'hideEverythingExceptGivenElement',
+  'restoreHiddenElements',
   'setLetterbox',
   'currentFullscreenStrategy',
   'restoreOldWindowedStyle',
-  'doRequestFullscreen',
+  'softFullscreenResizeWebGLRenderTarget',
   'registerTouchEventCallback',
   'fillGamepadEventData',
   'registerGamepadEventCallback',
