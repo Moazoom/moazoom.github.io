@@ -190,7 +190,7 @@ Module['FS_createPath']("/", "resources", true, true);
     }
 
     }
-    loadPackage({"files": [{"filename": "/resources/background.png", "start": 0, "end": 188}, {"filename": "/resources/ground.png", "start": 188, "end": 376}, {"filename": "/resources/leftButton.png", "start": 376, "end": 543}, {"filename": "/resources/player.png", "start": 543, "end": 659}, {"filename": "/resources/rightButton.png", "start": 659, "end": 826}, {"filename": "/resources/topsoil.png", "start": 826, "end": 1045}, {"filename": "/resources/world.png", "start": 1045, "end": 2060}], "remote_package_size": 2060});
+    loadPackage({"files": [{"filename": "/resources/background.png", "start": 0, "end": 188}, {"filename": "/resources/ground.png", "start": 188, "end": 376}, {"filename": "/resources/jump.wav", "start": 376, "end": 40876, "audio": 1}, {"filename": "/resources/leftButton.png", "start": 40876, "end": 41043}, {"filename": "/resources/player.png", "start": 41043, "end": 41159}, {"filename": "/resources/rightButton.png", "start": 41159, "end": 41326}, {"filename": "/resources/topsoil.png", "start": 41326, "end": 41545}, {"filename": "/resources/world.png", "start": 41545, "end": 42560}], "remote_package_size": 42560});
 
   })();
 
@@ -1192,6 +1192,19 @@ function dbg(text) {
 // end include: runtime_debug.js
 // === Body ===
 
+var ASM_CONSTS = {
+  120723: () => { if (typeof window === 'undefined' || (window.AudioContext || window.webkitAudioContext) === undefined) { return 0; } if (typeof(window.miniaudio) === 'undefined') { window.miniaudio = { referenceCount: 0 }; miniaudio.devices = []; miniaudio.track_device = function(device) { for (var iDevice = 0; iDevice < miniaudio.devices.length; ++iDevice) { if (miniaudio.devices[iDevice] == null) { miniaudio.devices[iDevice] = device; return iDevice; } } miniaudio.devices.push(device); return miniaudio.devices.length - 1; }; miniaudio.untrack_device_by_index = function(deviceIndex) { miniaudio.devices[deviceIndex] = null; while (miniaudio.devices.length > 0) { if (miniaudio.devices[miniaudio.devices.length-1] == null) { miniaudio.devices.pop(); } else { break; } } }; miniaudio.untrack_device = function(device) { for (var iDevice = 0; iDevice < miniaudio.devices.length; ++iDevice) { if (miniaudio.devices[iDevice] == device) { return miniaudio.untrack_device_by_index(iDevice); } } }; miniaudio.get_device_by_index = function(deviceIndex) { return miniaudio.devices[deviceIndex]; }; miniaudio.unlock_event_types = (function(){ return ['touchstart', 'touchend', 'click']; })(); miniaudio.unlock = function() { for(var i = 0; i < miniaudio.devices.length; ++i) { var device = miniaudio.devices[i]; if (device != null && device.webaudio != null && device.state === 2 ) { device.webaudio.resume(); } } miniaudio.unlock_event_types.map(function(event_type) { document.removeEventListener(event_type, miniaudio.unlock, true); }); }; miniaudio.unlock_event_types.map(function(event_type) { document.addEventListener(event_type, miniaudio.unlock, true); }); } window.miniaudio.referenceCount++; return 1; },  
+ 122422: () => { if (typeof(window.miniaudio) !== 'undefined') { window.miniaudio.referenceCount--; if (window.miniaudio.referenceCount === 0) { delete window.miniaudio; } } },  
+ 122583: () => { return (navigator.mediaDevices !== undefined && navigator.mediaDevices.getUserMedia !== undefined); },  
+ 122687: () => { try { var temp = new (window.AudioContext || window.webkitAudioContext)(); var sampleRate = temp.sampleRate; temp.close(); return sampleRate; } catch(e) { return 0; } },  
+ 122858: ($0, $1, $2, $3, $4, $5) => { var channels = $0; var sampleRate = $1; var bufferSize = $2; var isCapture = $3; var pDevice = $4; var pAllocationCallbacks = $5; if (typeof(window.miniaudio) === 'undefined') { return -1; } var device = {}; device.webaudio = new (window.AudioContext || window.webkitAudioContext)({sampleRate:sampleRate}); device.webaudio.suspend(); device.state = 1; device.intermediaryBufferSizeInBytes = channels * bufferSize * 4; device.intermediaryBuffer = _ma_malloc_emscripten(device.intermediaryBufferSizeInBytes, pAllocationCallbacks); device.intermediaryBufferView = new Float32Array(Module.HEAPF32.buffer, device.intermediaryBuffer, device.intermediaryBufferSizeInBytes); device.scriptNode = device.webaudio.createScriptProcessor(bufferSize, (isCapture) ? channels : 0, (isCapture) ? 0 : channels); if (isCapture) { device.scriptNode.onaudioprocess = function(e) { if (device.intermediaryBuffer === undefined) { return; } if (device.intermediaryBufferView.length == 0) { device.intermediaryBufferView = new Float32Array(Module.HEAPF32.buffer, device.intermediaryBuffer, device.intermediaryBufferSizeInBytes); } for (var iChannel = 0; iChannel < e.outputBuffer.numberOfChannels; ++iChannel) { e.outputBuffer.getChannelData(iChannel).fill(0.0); } var sendSilence = false; if (device.streamNode === undefined) { sendSilence = true; } if (e.inputBuffer.numberOfChannels != channels) { console.log("Capture: Channel count mismatch. " + e.inputBufer.numberOfChannels + " != " + channels + ". Sending silence."); sendSilence = true; } var totalFramesProcessed = 0; while (totalFramesProcessed < e.inputBuffer.length) { var framesRemaining = e.inputBuffer.length - totalFramesProcessed; var framesToProcess = framesRemaining; if (framesToProcess > (device.intermediaryBufferSizeInBytes/channels/4)) { framesToProcess = (device.intermediaryBufferSizeInBytes/channels/4); } if (sendSilence) { device.intermediaryBufferView.fill(0.0); } else { for (var iFrame = 0; iFrame < framesToProcess; ++iFrame) { for (var iChannel = 0; iChannel < e.inputBuffer.numberOfChannels; ++iChannel) { device.intermediaryBufferView[iFrame*channels + iChannel] = e.inputBuffer.getChannelData(iChannel)[totalFramesProcessed + iFrame]; } } } _ma_device_process_pcm_frames_capture__webaudio(pDevice, framesToProcess, device.intermediaryBuffer); totalFramesProcessed += framesToProcess; } }; navigator.mediaDevices.getUserMedia({audio:true, video:false}) .then(function(stream) { device.streamNode = device.webaudio.createMediaStreamSource(stream); device.streamNode.connect(device.scriptNode); device.scriptNode.connect(device.webaudio.destination); }) .catch(function(error) { device.scriptNode.connect(device.webaudio.destination); }); } else { device.scriptNode.onaudioprocess = function(e) { if (device.intermediaryBuffer === undefined) { return; } if(device.intermediaryBufferView.length == 0) { device.intermediaryBufferView = new Float32Array(Module.HEAPF32.buffer, device.intermediaryBuffer, device.intermediaryBufferSizeInBytes); } var outputSilence = false; if (e.outputBuffer.numberOfChannels != channels) { console.log("Playback: Channel count mismatch. " + e.outputBufer.numberOfChannels + " != " + channels + ". Outputting silence."); outputSilence = true; return; } var totalFramesProcessed = 0; while (totalFramesProcessed < e.outputBuffer.length) { var framesRemaining = e.outputBuffer.length - totalFramesProcessed; var framesToProcess = framesRemaining; if (framesToProcess > (device.intermediaryBufferSizeInBytes/channels/4)) { framesToProcess = (device.intermediaryBufferSizeInBytes/channels/4); } _ma_device_process_pcm_frames_playback__webaudio(pDevice, framesToProcess, device.intermediaryBuffer); if (outputSilence) { for (var iChannel = 0; iChannel < e.outputBuffer.numberOfChannels; ++iChannel) { e.outputBuffer.getChannelData(iChannel).fill(0.0); } } else { for (var iChannel = 0; iChannel < e.outputBuffer.numberOfChannels; ++iChannel) { var outputBuffer = e.outputBuffer.getChannelData(iChannel); var intermediaryBuffer = device.intermediaryBufferView; for (var iFrame = 0; iFrame < framesToProcess; ++iFrame) { outputBuffer[totalFramesProcessed + iFrame] = intermediaryBuffer[iFrame*channels + iChannel]; } } } totalFramesProcessed += framesToProcess; } }; device.scriptNode.connect(device.webaudio.destination); } return miniaudio.track_device(device); },  
+ 127208: ($0) => { return miniaudio.get_device_by_index($0).webaudio.sampleRate; },  
+ 127274: ($0, $1, $2, $3) => { var device = miniaudio.get_device_by_index($0); var pAllocationCallbacks = $3; if (device.scriptNode !== undefined) { device.scriptNode.onaudioprocess = function(e) {}; device.scriptNode.disconnect(); device.scriptNode = undefined; } if (device.streamNode !== undefined) { device.streamNode.disconnect(); device.streamNode = undefined; } device.webaudio.close(); device.webaudio = undefined; if (device.intermediaryBuffer !== undefined) { _ma_free_emscripten(device.intermediaryBuffer, pAllocationCallbacks); device.intermediaryBuffer = undefined; device.intermediaryBufferView = undefined; device.intermediaryBufferSizeInBytes = undefined; } miniaudio.untrack_device_by_index($0); },  
+ 127960: ($0) => { var device = miniaudio.get_device_by_index($0); device.webaudio.resume(); device.state = 2; },  
+ 128056: ($0) => { var device = miniaudio.get_device_by_index($0); device.webaudio.resume(); device.state = 2; },  
+ 128152: ($0) => { var device = miniaudio.get_device_by_index($0); device.webaudio.suspend(); device.state = 1; },  
+ 128249: ($0) => { var device = miniaudio.get_device_by_index($0); device.webaudio.suspend(); device.state = 1; }
+};
 function GetCanvasWidth() { return canvas.clientWidth; }
 function GetCanvasHeight() { return canvas.clientHeight; }
 
@@ -3836,6 +3849,41 @@ function GetCanvasHeight() { return canvas.clientHeight; }
   var nowIsMonotonic = true;;
   function __emscripten_get_now_is_monotonic() {
       return nowIsMonotonic;
+    }
+
+  var readEmAsmArgsArray = [];
+  function readEmAsmArgs(sigPtr, buf) {
+      // Nobody should have mutated _readEmAsmArgsArray underneath us to be something else than an array.
+      assert(Array.isArray(readEmAsmArgsArray));
+      // The input buffer is allocated on the stack, so it must be stack-aligned.
+      assert(buf % 16 == 0);
+      readEmAsmArgsArray.length = 0;
+      var ch;
+      // Most arguments are i32s, so shift the buffer pointer so it is a plain
+      // index into HEAP32.
+      buf >>= 2;
+      while (ch = HEAPU8[sigPtr++]) {
+        var chr = String.fromCharCode(ch);
+        var validChars = ['d', 'f', 'i'];
+        assert(validChars.includes(chr), `Invalid character ${ch}("${chr}") in readEmAsmArgs! Use only [${validChars}], and do not specify "v" for void return argument.`);
+        // Floats are always passed as doubles, and doubles and int64s take up 8
+        // bytes (two 32-bit slots) in memory, align reads to these:
+        buf += (ch != 105/*i*/) & buf;
+        readEmAsmArgsArray.push(
+          ch == 105/*i*/ ? HEAP32[buf] :
+         HEAPF64[buf++ >> 1]
+        );
+        ++buf;
+      }
+      return readEmAsmArgsArray;
+    }
+  function runEmAsmFunction(code, sigPtr, argbuf) {
+      var args = readEmAsmArgs(sigPtr, argbuf);
+      if (!ASM_CONSTS.hasOwnProperty(code)) abort(`No EM_ASM constant found at address ${code}`);
+      return ASM_CONSTS[code].apply(null, args);
+    }
+  function _emscripten_asm_const_int(code, sigPtr, argbuf) {
+      return runEmAsmFunction(code, sigPtr, argbuf);
     }
 
   function _emscripten_date_now() {
@@ -9093,6 +9141,7 @@ var wasmImports = {
   "__syscall_ioctl": ___syscall_ioctl,
   "__syscall_openat": ___syscall_openat,
   "_emscripten_get_now_is_monotonic": __emscripten_get_now_is_monotonic,
+  "emscripten_asm_const_int": _emscripten_asm_const_int,
   "emscripten_date_now": _emscripten_date_now,
   "emscripten_enter_soft_fullscreen": _emscripten_enter_soft_fullscreen,
   "emscripten_get_element_css_size": _emscripten_get_element_css_size,
@@ -9369,6 +9418,14 @@ var _free = createExportWrapper("free");
 /** @type {function(...*):?} */
 var _fflush = Module["_fflush"] = createExportWrapper("fflush");
 /** @type {function(...*):?} */
+var _ma_malloc_emscripten = Module["_ma_malloc_emscripten"] = createExportWrapper("ma_malloc_emscripten");
+/** @type {function(...*):?} */
+var _ma_free_emscripten = Module["_ma_free_emscripten"] = createExportWrapper("ma_free_emscripten");
+/** @type {function(...*):?} */
+var _ma_device_process_pcm_frames_capture__webaudio = Module["_ma_device_process_pcm_frames_capture__webaudio"] = createExportWrapper("ma_device_process_pcm_frames_capture__webaudio");
+/** @type {function(...*):?} */
+var _ma_device_process_pcm_frames_playback__webaudio = Module["_ma_device_process_pcm_frames_playback__webaudio"] = createExportWrapper("ma_device_process_pcm_frames_playback__webaudio");
+/** @type {function(...*):?} */
 var ___errno_location = createExportWrapper("__errno_location");
 /** @type {function(...*):?} */
 var _emscripten_stack_init = function() {
@@ -9421,6 +9478,16 @@ var dynCall_vidd = Module["dynCall_vidd"] = createExportWrapper("dynCall_vidd");
 /** @type {function(...*):?} */
 var dynCall_ii = Module["dynCall_ii"] = createExportWrapper("dynCall_ii");
 /** @type {function(...*):?} */
+var dynCall_iii = Module["dynCall_iii"] = createExportWrapper("dynCall_iii");
+/** @type {function(...*):?} */
+var dynCall_iiiii = Module["dynCall_iiiii"] = createExportWrapper("dynCall_iiiii");
+/** @type {function(...*):?} */
+var dynCall_iiiiiii = Module["dynCall_iiiiiii"] = createExportWrapper("dynCall_iiiiiii");
+/** @type {function(...*):?} */
+var dynCall_jii = Module["dynCall_jii"] = createExportWrapper("dynCall_jii");
+/** @type {function(...*):?} */
+var dynCall_iiiji = Module["dynCall_iiiji"] = createExportWrapper("dynCall_iiiji");
+/** @type {function(...*):?} */
 var dynCall_vi = Module["dynCall_vi"] = createExportWrapper("dynCall_vi");
 /** @type {function(...*):?} */
 var dynCall_vffff = Module["dynCall_vffff"] = createExportWrapper("dynCall_vffff");
@@ -9438,8 +9505,6 @@ var dynCall_vff = Module["dynCall_vff"] = createExportWrapper("dynCall_vff");
 var dynCall_v = Module["dynCall_v"] = createExportWrapper("dynCall_v");
 /** @type {function(...*):?} */
 var dynCall_viiiiiii = Module["dynCall_viiiiiii"] = createExportWrapper("dynCall_viiiiiii");
-/** @type {function(...*):?} */
-var dynCall_iii = Module["dynCall_iii"] = createExportWrapper("dynCall_iii");
 /** @type {function(...*):?} */
 var dynCall_vfi = Module["dynCall_vfi"] = createExportWrapper("dynCall_vfi");
 /** @type {function(...*):?} */
@@ -9466,8 +9531,8 @@ var _asyncify_stop_unwind = createExportWrapper("asyncify_stop_unwind");
 var _asyncify_start_rewind = createExportWrapper("asyncify_start_rewind");
 /** @type {function(...*):?} */
 var _asyncify_stop_rewind = createExportWrapper("asyncify_stop_rewind");
-var ___start_em_js = Module['___start_em_js'] = 92472;
-var ___stop_em_js = Module['___stop_em_js'] = 92547;
+var ___start_em_js = Module['___start_em_js'] = 120648;
+var ___stop_em_js = Module['___stop_em_js'] = 120723;
 
 // include: postamble.js
 // === Auto-generated postamble setup entry stuff ===
@@ -9497,7 +9562,7 @@ var missingLibrarySymbols = [
   'getCallstack',
   'emscriptenLog',
   'convertPCtoSourceLocation',
-  'readEmAsmArgs',
+  'runMainThreadEmAsm',
   'jstoi_s',
   'getExecutableName',
   'listenOnce',
@@ -9642,6 +9707,8 @@ var unexportedSymbols = [
   'warnOnce',
   'UNWIND_CACHE',
   'readEmAsmArgsArray',
+  'readEmAsmArgs',
+  'runEmAsmFunction',
   'jstoi_q',
   'handleException',
   'runtimeKeepalivePush',
