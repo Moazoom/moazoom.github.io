@@ -1,19 +1,227 @@
 <!DOCTYPE html>
-<html>
-
+<html lang="en">
 <head>
-    <meta charset="utf-8">
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>⚡ Performance Engineer | C++ × Python</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
 </head>
-
 <body>
-    <canvas id="canvas" oncontextmenu="event.preventDefault()"></canvas>
-    <script type='text/javascript'>
-        var Module = {
-            canvas: (function() { return document.getElementById('canvas'); })()
-        };
-    </script>
-    <script src="main.js"></script>
-</body>
+    <!-- Glowing orb background effect -->
+    <div class="orb"></div>
+    <div class="orb orb2"></div>
 
+    <!-- NAV -->
+    <nav>
+        <div class="nav-container">
+            <div class="logo">&lt;⚡ perf/&gt;</div>
+            <ul class="nav-links">
+                <li><a href="#benchmarks">Benchmarks</a></li>
+                <li><a href="#projects">Projects</a></li>
+                <li><a href="#contact" class="nav-cta">Hire Me</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <!-- HERO -->
+    <section class="hero">
+        <div class="hero-container">
+            <div class="hero-badge">
+                <span class="dot"></span> Available for freelance
+            </div>
+            <h1>
+                I make Python<br>
+                <span class="gradient-text">ridiculously fast</span>
+            </h1>
+            <p class="hero-sub">
+                C++ performance engineer specializing in <span class="highlight">100x–1000x</span> speedups 
+                using pybind11, SIMD, and zero-copy optimizations.
+            </p>
+            <div class="hero-stats">
+                <div class="stat">
+                    <span class="stat-number" data-target="212">0</span><span class="stat-suffix">x</span>
+                    <span class="stat-label">Peak Speedup</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-number" data-target="45">0</span><span class="stat-suffix">s → 0.4s</span>
+                    <span class="stat-label">CSV Parsing</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-number" data-target="100">0</span><span class="stat-suffix">%</span>
+                    <span class="stat-label">Python Code Preserved</span>
+                </div>
+            </div>
+            <div class="hero-cta">
+                <a href="#benchmarks" class="btn-primary">See my benchmarks ↓</a>
+                <a href="#contact" class="btn-secondary">Hire me</a>
+            </div>
+        </div>
+    </section>
+
+    <!-- BENCHMARK SECTION -->
+    <section id="benchmarks" class="benchmarks">
+        <div class="section-container">
+            <div class="section-header">
+                <span class="section-tag">📊 Live Benchmarks</span>
+                <h2>Before vs. After</h2>
+                <p>Every optimization I ship comes with a guaranteed performance report.</p>
+            </div>
+
+            <!-- Benchmark Card 1: Matrix Multiplication -->
+            <div class="benchmark-card">
+                <div class="benchmark-header">
+                    <h3>Matrix Multiplication + ReLU (1000x1000)</h3>
+                    <span class="speedup-badge">212x FASTER</span>
+                </div>
+                <div class="benchmark-chart">
+                    <div class="chart-container">
+                        <div class="bar-wrapper">
+                            <div class="bar-label">Python (Nested Loops)</div>
+                            <div class="bar-track">
+                                <div class="bar-fill python-bar" style="width: 100%">8.52s</div>
+                            </div>
+                        </div>
+                        <div class="bar-wrapper">
+                            <div class="bar-label">NumPy (Vectorized)</div>
+                            <div class="bar-track">
+                                <div class="bar-fill numpy-bar" style="width: 3.7%">0.32s</div>
+                            </div>
+                        </div>
+                        <div class="bar-wrapper">
+                            <div class="bar-label">C++ pybind11</div>
+                            <div class="bar-track">
+                                <div class="bar-fill cpp-bar" style="width: 1.7%">0.15s</div>
+                            </div>
+                        </div>
+                        <div class="bar-wrapper highlight-bar">
+                            <div class="bar-label">C++ + OpenMP + SIMD ⚡</div>
+                            <div class="bar-track">
+                                <div class="bar-fill simd-bar" style="width: 0.47%">0.04s</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="benchmark-details">
+                    <div class="detail-item">
+                        <span class="detail-label">Technologies</span>
+                        <span class="detail-value">pybind11, OpenMP, AVX2, -O3</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Memory Allocations</span>
+                        <span class="detail-value">2,000,000 → 0 (zero-copy)</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">CPU Utilization</span>
+                        <span class="detail-value"><span class="cpu-meter"><span class="cpu-fill" style="width: 92%"></span></span> 92%</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Benchmark Card 2: CSV Parsing -->
+            <div class="benchmark-card">
+                <div class="benchmark-header">
+                    <h3>CSV Parsing (1GB file)</h3>
+                    <span class="speedup-badge">112x FASTER</span>
+                </div>
+                <div class="benchmark-chart">
+                    <div class="chart-container">
+                        <div class="bar-wrapper">
+                            <div class="bar-label">Python (pandas)</div>
+                            <div class="bar-track">
+                                <div class="bar-fill python-bar" style="width: 100%">45.0s</div>
+                            </div>
+                        </div>
+                        <div class="bar-wrapper">
+                            <div class="bar-label">C++ std::ifstream</div>
+                            <div class="bar-track">
+                                <div class="bar-fill cpp-bar" style="width: 12%">5.4s</div>
+                            </div>
+                        </div>
+                        <div class="bar-wrapper highlight-bar">
+                            <div class="bar-label">C++ mmap + std::from_chars ⚡</div>
+                            <div class="bar-track">
+                                <div class="bar-fill simd-bar" style="width: 0.89%">0.4s</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="benchmark-details">
+                    <div class="detail-item">
+                        <span class="detail-label">Technologies</span>
+                        <span class="detail-value">mmap, std::from_chars, zero-copy</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Memory Footprint</span>
+                        <span class="detail-value">1.2GB → 8MB (memory mapped)</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- PROJECTS -->
+    <section id="projects" class="projects">
+        <div class="section-container">
+            <div class="section-header">
+                <span class="section-tag">🔧 Portfolio Projects</span>
+                <h2>Real problems, solved</h2>
+            </div>
+            <div class="project-grid">
+                <div class="project-card">
+                    <div class="project-icon">⚡</div>
+                    <h3>CSV Accelerator</h3>
+                    <p>C++17 + pybind11 library that parses 1GB CSV files 112x faster than pandas with zero-copy memory mapping.</p>
+                    <div class="project-tags">
+                        <span>C++17</span><span>pybind11</span><span>mmap</span>
+                    </div>
+                    <a href="#" class="project-link">View on GitHub →</a>
+                </div>
+                <div class="project-card">
+                    <div class="project-icon">🧠</div>
+                    <h3>Fast Neural Ops</h3>
+                    <p>Custom C++ CUDA-like operators for PyTorch. Fused matrix multiplication + ReLU achieves 212x speedup over pure Python.</p>
+                    <div class="project-tags">
+                        <span>C++</span><span>OpenMP</span><span>SIMD</span><span>PyTorch</span>
+                    </div>
+                    <a href="#" class="project-link">View on GitHub →</a>
+                </div>
+                <div class="project-card">
+                    <div class="project-icon">📡</div>
+                    <h3>ESP32 Sensor Logger</h3>
+                    <p>Real-time C++ firmware on ESP32 with IIR filtering + Python desktop visualizer with live matplotlib plots.</p>
+                    <div class="project-tags">
+                        <span>ESP32</span><span>C++</span><span>PySerial</span><span>matplotlib</span>
+                    </div>
+                    <a href="#" class="project-link">View on GitHub →</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CONTACT / HIRE -->
+    <section id="contact" class="contact">
+        <div class="section-container">
+            <div class="contact-box">
+                <span class="section-tag">💼 Available for freelance</span>
+                <h2>Let's make your Python <span class="gradient-text">blazing fast</span></h2>
+                <p>I work on a fixed-price basis. You get a performance report before I write a single line of code.</p>
+                <div class="contact-links">
+                    <a href="mailto:your.email@example.com" class="btn-primary">✉️ Email me</a>
+                    <a href="https://github.com/yourusername" class="btn-secondary">GitHub</a>
+                    <a href="https://linkedin.com/in/yourusername" class="btn-secondary">LinkedIn</a>
+                </div>
+                <div class="contact-availability">
+                    <span class="dot"></span> Responds within 4 hours
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <footer>
+        <p>Built with ❤️ and <span class="highlight">C++</span></p>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
 </html>
