@@ -11,7 +11,7 @@ buyPrice = mid.number_input("Purchase Price", value=0.00)
 faceValue = right.number_input("Face Value", value=0, step=1, format="%d")
 
 investment = numShares * buyPrice
-st.write("> #### Your investment is: Rs. " + str(investment))
+st.write("> #### Your investment is Rs. " + str(investment))
 
 col1, col2, col3, col4 = st.columns(4)
 
@@ -23,20 +23,20 @@ q4 = col4.number_input("Quater 4 %", max_value=100.00, value=0.00, placeholder="
 
 filer = st.segmented_control("Are you a filer?", ["Filer", "Non filer"])
 
-if (st.button("Calculate")):
+if ((filer != None) and (investment)):
 
     totalDiv = q1 + q2 + q3 + q4
     amount  = numShares * buyPrice
 
     if (filer == "Filer"):
         out = 0.85 * faceValue * totalDiv * numShares / amount
-        "> #### Dividend as Percent: " + str(round(out, 2)) + "%"
-        "> #### Profit from Investment: Rs. " + str(out * investment / 100)
+        "> #### Your dividend as a percentage is " + str(round(out, 2)) + "%"
+        "> #### Your total profit is Rs. " + str(out * investment / 100)
 
     elif (filer == "Non filer"):
         out = 0.7 * faceValue * totalDiv * numShares / amount
-        "> #### Dividend as Percent: " + str(round(out, 2)) + "%"
-        "> #### Profit from Investment: Rs. " + str(out * investment / 100)
+        "> #### Your dividend as a percentage is " + str(round(out, 2)) + "%"
+        "> #### Your total profit is Rs. " + str(out * investment / 100)
     else:
         "> #### Please enter all values"
 
