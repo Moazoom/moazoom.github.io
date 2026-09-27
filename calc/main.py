@@ -11,7 +11,7 @@ buyPrice = mid.number_input("Purchase Price", value=0.00)
 faceValue = right.number_input("Face Value", value=0, step=1, format="%d")
 
 investment = numShares * buyPrice
-st.write("> #### Your investment is Rs. " + str(investment))
+st.write("> #### Your investment is Rs. " + str(round(investment, 2)))
 
 col1, col2, col3, col4 = st.columns(4)
 
@@ -31,12 +31,12 @@ if ((filer != None) and (investment)):
     if (filer == "Filer"):
         out = 0.85 * faceValue * totalDiv * numShares / amount
         "> #### Your dividend as a percentage is " + str(round(out, 2)) + "%"
-        "> #### Your total profit is Rs. " + str(out * investment / 100)
+        "> #### Your total gain is Rs. " + str(round(out * investment / 100, 2))
 
     elif (filer == "Non filer"):
         out = 0.7 * faceValue * totalDiv * numShares / amount
         "> #### Your dividend as a percentage is " + str(round(out, 2)) + "%"
-        "> #### Your total profit is Rs. " + str(out * investment / 100)
+        "> #### Your total gain is Rs. " + str(round(out * investment / 100, 2))
     else:
         "> #### Please enter all values"
 
